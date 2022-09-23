@@ -1,0 +1,45 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;700&display=swap');
+
+$white: #fff;
+$main-color: #f8f8f8;
+$brand-color: #45546B;
+$highlight-color: #C8A79A;
+$yellow: #F9EB69;
+
+$font: 'Noto Serif TC','Quicksand', sans-serif;
+$font-color: #333333;
+
+
+::placeholder { /* CSS 3 標準 */
+  color:$brand-color
+}
+
+
+
+  
+%clearfix {
+  &:before, &:after {
+    content: " ";
+    display: table;
+  }
+  &:after {
+    clear: both;
+  }
+}
+
+
+
+@mixin max-screen($max) {
+  @media screen and (max-width: $max) {
+      @content;
+  }
+}
+  
+  
+  
+@mixin min-screen($min) {
+  @media screen and (min-width: $min) {
+      @content;
+  }
+}

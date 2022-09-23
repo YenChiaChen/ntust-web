@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<!--[if lte IE 9]><meta http-equiv="X-UA-Compatible" content="IE=EmulateIE8" /><![endif]-->
+<!--[if !IE]><!-->
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="favicon.ico">
+    <link rel="stylesheet" href="css/style.css">
+    <title>前瞻顯示科技與跨領域應用教學聯盟</title>
+    <meta name="description" content="前瞻顯示科技與跨領域應用教學聯盟">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>      
+</head>
+<body>
+<div id="main">
+    <div class="bg-wrap wrap">
+        <canvas id="particle-canvas"></canvas>
+        <script id="vs" type="x-shader/x-vertex">
+                varying vec3 vPos;
+        
+          uniform float uTick;
+        
+          const float PI = 3.1415926;
+        
+          mat2 calcRotate2D(float _time){
+            float _sin = sin(_time);
+            float _cos = cos(_time);
+            return mat2(_cos, _sin, -_sin, _cos);
+          }
+        
+          vec3 paramFunction1(){
+              float u = -uv.x * 2.0 * PI;
+              float v = uv.y * PI;
+        
+              float _x = sin(u) * sin(v);
+              float _y = cos(u) * sin(v);
+              float _z = cos(v);
+        
+              return vec3(_x, _y, _z);
+          }
+        
+        
+          vec3 paramFunction2(){
+              float a = 3.0;
+              float n = 3.0;
+              float m = 1.0;
+        
+              float u = uv.x * 4.0 * PI;
+              float v = uv.y * 2.0 * PI;
+        
+              float _x = (a + cos(n * u / 2.0) * sin(v) - sin(n * u / 2.0) * sin(2.0 * v)) * cos(m * u / 2.0);
+              float _y = (a + cos(n * u / 2.0) * sin(v) - sin(n * u / 2.0) * sin(2.0 * v)) * sin(m * u / 2.0);
+              float _z = sin(n * u / 2.0) * sin(v) + cos(n * u / 2.0) * sin(2.0 * v);
+        
+              return vec3(_x, _y, _z);
+          }
+        
+        
+          void main(){
+            float time = uTick * 0.012;
+        
+            float shapeRatio = cos(time * 1.5 + sin(time * 1.5)) * 0.5 + 0.5;
+        
+            vec3 shape1 = paramFunction1() * 1.5;
+            vec3 shape2 = paramFunction2();
+        
+        
+            vec3 newPos =mix(shape2, shape1, shapeRatio);
+            // vec3 newPos = shape2;
+        
+            vec3 scalePos = newPos * 4.0;
+        
+        
+            vec3 rotatePos = scalePos;
+            rotatePos.yz = calcRotate2D(time * 0.6) * rotatePos.yz;
+            rotatePos.xz = calcRotate2D(time * 0.6) * rotatePos.xz;
+        
+            vec4 mvPos = vec4(rotatePos, 1.0);
+        
+            vPos = mvPos.xyz;
+            // vNormal = normal;
+        
+            gl_Position =projectionMatrix * modelViewMatrix * mvPos; 
+          }
+        </script>
+        
+        <script id="fs" type="x-shader/x-fragment">
+                varying vec3 vPos;
+          // varying vec3 vNormal;
+        
+          uniform float uTick;
+        
+          // base color
+          const vec3 objColor = vec3(1.0);
+          
+          
+          // hemisphere ground color
+          const vec3 hemiLight_g = vec3(0.86,0.86,0.86);
+          
+          // hemisphere sky color
+          const vec3 hemiLight_s_1 = vec3(0.5882352941176471,0.8274509803921568,0.8823529411764706);
+          const vec3 hemiLight_s_2 = vec3(0.9686274509803922,0.8509803921568627,0.6666666666666666);
+          const vec3 hemiLight_s_3 = vec3(0.8784313725490196,0.5882352941176471,0.7647058823529411);
+          
+          // directional light color
+          const vec3 dirLight = vec3(0.16);
+          const vec3 dirLight_2 = vec3(0.02);
+        
+        
+          const vec3 hemiLightPos_1 = vec3(100.0, 100.0, -100.0);
+          const vec3 hemiLightPos_2 = vec3(-100.0, -100.0, 100.0);
+          const vec3 hemiLightPos_3 = vec3(-100.0, 100.0, 100.0);
+        
+          const vec3 dirLightPos = vec3(-30, 50, 50);
+          const vec3 dirLightPos_2 = vec3(30, -50, -50);
+        
+          vec3 calcIrradiance_hemi(vec3 newNormal, vec3 lightPos, vec3 grd, vec3 sky){
+            float dotNL = dot(newNormal, normalize(lightPos));
+            float hemiDiffuseWeight = 0.5 * dotNL + 0.5;
+        
+            return mix(grd, sky, hemiDiffuseWeight);
+          }
+        
+          vec3 calcIrradiance_dir(vec3 newNormal, vec3 lightPos, vec3 light){
+            float dotNL = dot(newNormal, normalize(lightPos));
+        
+            return light * max(0.0, dotNL);
+          }
+        
+        
+          void main(){
+        
+            float time = uTick * 0.006;
+        
+            vec3 _normal = normalize(cross(dFdx(vPos), dFdy(vPos)));
+        
+            vec3 hemiColor = vec3(0.0);
+            hemiColor += calcIrradiance_hemi(_normal, hemiLightPos_1, hemiLight_g, hemiLight_s_1) * 0.38;
+            hemiColor += calcIrradiance_hemi(_normal, hemiLightPos_2, hemiLight_g, hemiLight_s_2) * 0.26;
+            hemiColor += calcIrradiance_hemi(_normal, hemiLightPos_3, hemiLight_g, hemiLight_s_3) * 0.36;
+            
+            vec3 dirColor = vec3(0.0);
+            dirColor += calcIrradiance_dir(_normal, dirLightPos, dirLight);
+            dirColor += calcIrradiance_dir(_normal, dirLightPos_2, dirLight_2);
+        
+        
+            vec3 color = objColor * hemiColor;
+            
+            color += dirColor;
+        
+        
+            gl_FragColor = vec4(color, 1.0);
+          }
+        </script>
+    </div>
+
+    <div class="home">
+            
+        <header id="navbar-main">
+            <nav class="navbar">
+                <a href="index.html" class="navbar-brand" ><img src="img/logo-main.png" alt="" class="logo-main"></a>
+                <ul class="nav-menu -pull-right" id="mobilemenu">
+                    <li class="nav-item subnav">
+                        <a href="javascript:void(0)" class="nav-link">計畫介紹</a>
+                        <ul class="subnav-content">
+                            <li><a href="index.html#intro">聯盟介紹</a></li>
+                            <li><a href="project.html">計畫內容</a></li>
+                            <li><a href="member.html">聯盟成員</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item"><a href="news.html" class="nav-link">最新消息</a></li>
+                    <li class="nav-item"><a href="highschool.html" class="nav-link">高中職校專區</a></li>
+                    <li class="nav-item subnav">
+                        <a href="module.html" class="nav-link">微課程模組</a>
+                        <ul class="subnav-content">
+                            <li><a href="module.html">聯盟課程地圖</a></li>
+                            <li><a href="module.html#moduleZ">向下扎根-基礎先修課程</a></li>
+                            <li><a href="module.html#moduleA">A.顯示科技專業知識導入模組</a></li>
+                            <li><a href="module.html#moduleB">B.顯示科技實驗 / 實作模組</a></li>
+                            <li><a href="module.html#moduleC">C.跨域應用模組</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item"><a href="media.html" class="nav-link">影音專區</a></li>
+                    <li class="nav-item"><a href="javascript:void(0)" class="nav-link">問卷專區</a></li>
+                </ul>
+
+                <button type="button" class="navbar-toggle" id="navToggle">
+                    <span class="sr-only">選單</span>
+                    <span class="icon-bar item1"></span>
+                    <span class="icon-bar item2"></span>
+                    <span class="icon-bar item3"></span>
+                </button>
+            </nav>    
+        </header>
+        
+        <div id="contents-wrap">
+            <div class="title"><h2>計畫內容</h2></div>
+            <div class="content">
+                <div class="susy-container">
+                    <div class="block mb60">
+                        <h3>計畫背景</h3>
+                        <p>2019 年我國召開「智慧生活顯示科技與應用產業策略（SRB）會議」，研議善用我國顯示科技與應用產業既有堅實基礎，結合5G 與智聯網（AIoT）等智慧科技，勾勒2030智慧生活未來產業策略發展藍圖，期望推動顯示科技成為落實智慧生活的重要人機互動體驗介面，讓臺灣成為全球提供顯示科技與應用解決方案重鎮。
+                                我國資通訊產業已有厚實基礎，在AI和 5G等新興科技帶動下，資通訊產品帶給使用者更豐富的互動體驗，預期顯示科技與應用將成為下一波產業成長的動能。此外，我國周遭鄰近國家如中國大陸、韓國等，皆以政府為首，投入大量資源以求在AR/VR此一全新發展機會搶占先機，擺脫過去受制於歐美先進國家的困境。
+                                AR/VR是高度跨領域的產業，結合音樂、電影、現場體驗、硬體、光電甚至軍事、醫療、教育、智慧程式等，AR/VR的發展也高度依賴面板、光學、網通、影像監控/演算和數位內容的發展程度，而我國在這些領域產業上，不僅擁有豐厚深遠的發展歷程，且技術上亦曾經領先亞洲其他各國。</p>
+                        <p>
+                                本計畫推動概念是<span class="strong">以前瞻智慧顯示影音與互動為主要發展領域</span>，組成「高解析實境顯示於智慧育樂跨領域應用教學聯盟」，中心學校為<span class="strong">臺灣科技大學</span>，結合夥伴學校包括：<span class="strong">臺灣師範大學</span>、<span class="strong">臺北教育大學</span>、<span class="strong">臺北藝術大學</span>、<span class="strong">世新大學</span>及<span class="strong">華夏科技大學</span>，共同推行高解析實境顯示跨領域應用人才培訓計畫，以「做中學(Learning by doing)」的模式，培養學生跨領域應用設計的能力，並結合本校及夥伴學校各領域之頂尖教師與特色實驗室的設備支援，使學生具備此新世代產業相關的研發能力，進而提升其就業競爭力。
+                            </p>
+                    </div>
+                    <div class="block mb60">
+                        <h3>未來規劃</h3>
+                        <p><span class="strong">讓臺灣成為全球提供顯示科技與應用解決方案重鎮</span>。我國資通訊產業已有厚實基礎，在AI和5G等新興科技帶動下，資通訊產品帶給使用者更豐富的互動體驗，預期顯示科技與應用將成為下一波產業成長的動能。此外，我國周遭鄰近國家如中國大陸、韓國等，皆以政府為首，投入大量資源以求在AR/VR此一全新發展機會搶占先機，擺脫過去受制於歐美先進國家的困境。AR/VR是高度跨領域的產業，結合音樂、電影、現場體驗、硬體、光電甚至軍事、醫療、教育、智慧程式等，AR/VR的發展也高度依賴面板、光學、網通、影像監控/演算和數位內容的發展程度，而我國在這些領域產業上，不僅擁有豐厚深遠的發展歷程，且技術上亦曾經領先亞洲其他各國。
+                            </p>
+                    </div>
+                    <div class="block mb60">
+                        <h3>總體目標</h3>
+                        <p>高解析實境顯示於智慧育樂跨領域應用教學聯盟計畫的規劃發展方向主要是以「前瞻智慧顯示影音與互動」為主要發展領域，執行模式聚焦在三大主軸計畫：</p>
+                            <ul>
+                                <li>1. 課程模組的建置推廣</li>
+                                <li>2. 跨域創新場域實證</li>
+                                <li>3. 顯示科技人才培育</li>
+                            </ul>
+
+                        <p>規劃發展方向說明如下：</p>
+                            <ul>
+                                <li>
+                                    <span class="strong">課程模組的建置推廣</span>
+                                    <p>集結中心學校及夥伴學校在顯示科技與跨域應用相關系所的專業教師團隊，在兩期的課程中共同設計出涵蓋四大領域 (顯示光學技術原理與應用、色彩影像設計與視覺人因、實境影像處理與環境設計、顯示互動軟體設計與開發) 的34門微課程模組。</p>
+                                </li>
+                                <li>
+                                    <span class="strong">跨域創新場域實證</span>
+                                    <p>在計畫執行過程中，與四家合作企業 (鈊象電子股份有限公司、優力勁聯股份有限公司、志合訊息股份有限公司、光禾感知科技股份有限公司) 進行產業交流與產業實務實習，同時鏈結跨域應用校園示範場域，強化顯示科技發展及推廣跨域應用。</p>
+                                </li>
+                                <li>
+                                    <span class="strong">顯示科技人才培育</span>
+                                    <p>在兩期課程中，將針對代表性的課程模組建置數位教材，並同時建置自學平台。對於加入聯盟的五所高中職校 (大安高工、南港高工、成功高中、師大附中、中山女中) 進行課程活動推廣，並舉辦高解析實境顯示的創意遊戲設計大賽及進行專題成果發表。</p>
+                                </li>
+                            </ul>    
+                    </div>
+                </div>
+            </div>
+        </div>
+    
+        <div class="section text-center footer" id="footer">
+            <div class="susy-container">
+                <div class="copyright">
+                    <p>© 2022 國立臺灣科技大學高解析實境顯示於智慧育樂跨領域應用教學聯盟. All Rights Reserved. </p>
+                    <p>聯絡人：吳小姐</p>
+                    <p>連絡電話：(02)2733-3141分機6810</p>
+                </div>
+            </div>
+        </div>
+    
+    </div>
+</div>
+
+<script>
+    // modified version of random-normal
+    function normalPool(o) {
+        var r = 0;
+        do {
+            var a = Math.round(normal({
+                mean: o.mean,
+                dev: o.dev
+            }));
+            if (a < o.pool.length && a >= 0) return o.pool[a];
+            r++
+        } while (r < 100)
+    }
+
+    function randomNormal(o) {
+        if (o = Object.assign({
+                mean: 0,
+                dev: 1,
+                pool: []
+            }, o), Array.isArray(o.pool) && o.pool.length > 0) return normalPool(o);
+        var r, a, n, e, l = o.mean,
+            t = o.dev;
+        do {
+            r = (a = 2 * Math.random() - 1) * a + (n = 2 * Math.random() - 1) * n
+        } while (r >= 1);
+        return e = a * Math.sqrt(-2 * Math.log(r) / r), t * e + l
+    }
+
+    const NUM_PARTICLES = 500;
+    const PARTICLE_SIZE = 0.2; // View heights
+    const SPEED = 40000; // Milliseconds
+
+    let particles = [];
+
+    function rand(low, high) {
+        return Math.random() * (high - low) + low;
+    }
+
+    function createParticle(canvas) {
+        const colour = {
+            r: 45,
+            g: randomNormal({
+                mean: 125,
+                dev: 20
+            }),
+            b: 250,
+            a: rand(0, 0.5),
+        };
+        return {
+            x: -2,
+            y: -2,
+            diameter: Math.max(0, randomNormal({
+                mean: PARTICLE_SIZE,
+                dev: PARTICLE_SIZE / 2
+            })),
+            duration: randomNormal({
+                mean: SPEED,
+                dev: SPEED * 0.1
+            }),
+            amplitude: randomNormal({
+                mean: 16,
+                dev: 2
+            }),
+            offsetY: randomNormal({
+                mean: 0,
+                dev: 10
+            }),
+            arc: Math.PI * 2,
+            startTime: performance.now() - rand(0, SPEED),
+            colour: `rgba(${colour.r}, ${colour.g}, ${colour.b}, ${colour.a})`,
+        }
+    }
+
+    function moveParticle(particle, canvas, time) {
+        const progress = ((time - particle.startTime) % particle.duration) / particle.duration;
+        return {
+            ...particle,
+            x: progress,
+            y: ((Math.sin(progress * particle.arc) * particle.amplitude) + particle.offsetY),
+        };
+    }
+
+    function drawParticle(particle, canvas, ctx) {
+        canvas = document.getElementById('particle-canvas');
+        const vh = canvas.height / 100;
+
+        ctx.fillStyle = particle.colour;
+        ctx.beginPath();
+        ctx.ellipse(
+            particle.x * canvas.width,
+            particle.y * vh + (canvas.height / 2),
+            particle.diameter * vh,
+            particle.diameter * vh,
+            0,
+            0,
+            2 * Math.PI
+        );
+        ctx.fill();
+    }
+
+    function draw(time, canvas, ctx) {
+        // Move particles
+        particles.forEach((particle, index) => {
+            particles[index] = moveParticle(particle, canvas, time);
+        })
+
+        // Clear the canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw the particles
+        particles.forEach((particle) => {
+            drawParticle(particle, canvas, ctx);
+        })
+
+        // Schedule next frame
+        requestAnimationFrame((time) => draw(time, canvas, ctx));
+    }
+
+    function initializeCanvas() {
+        screenWidth = window.innerWidth,
+        screenHeight = window.innerHeight,
+        wrapWidth = (window.innerHeight / 1) * 2;
+
+        let canvas = document.getElementById('particle-canvas');
+        // canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+        // canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+        canvas.width = wrapWidth;
+        canvas.height = screenHeight;
+        let ctx = canvas.getContext("2d");
+
+        window.addEventListener('resize', () => {
+            canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+            canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+            ctx = canvas.getContext("2d");
+        })
+
+        return [canvas, ctx];
+    }
+
+    function startAnimation() {
+        const [canvas, ctx] = initializeCanvas();
+
+        // Create a bunch of particles
+        for (let i = 0; i < NUM_PARTICLES; i++) {
+            particles.push(createParticle(canvas));
+        }
+
+        requestAnimationFrame((time) => draw(time, canvas, ctx));
+    };
+
+    // Start animation when document is loaded
+    (function () {
+        if (document.readystate !== 'loading') {
+            startAnimation();
+        } else {
+            document.addEventListener('DOMContentLoaded', () => {
+                startAnimation();
+            })
+        }
+    }());
+</script>
+
+<script type="text/javascript" src="js/init.js"></script> 
+</body>
+</html>
